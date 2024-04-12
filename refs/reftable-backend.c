@@ -935,7 +935,28 @@ static int reftable_be_transaction_prepare(struct ref_store *ref_store,
 		 * individual refs. But the error messages match what the files
 		 * backend returns, which keeps our tests happy.
 		 */
-		if (u->flags & REF_HAVE_OLD && !oideq(&current_oid, &u->old_oid)) {
+		if ((u->flags & REF_HAVE_OLD) &&
+		    (u->flags & REF_SYMREF_UPDATE) &&
+		    u->old_ref) {
+			if   (strcmp(referent.buf, u->old_ref)) {
+				if (!strcmp(u->old_ref, ""))
+					strbuf_addf(err, "cannot lock ref '%s': "
+						    "reference already exists",
+						    original_update_refname(u));
+				else if (!strcmp(referent.buf, ""))
+					strbuf_addf(err, "cannot lock ref '%s': "
+						    "reference is missing but expected %s",
+						    original_update_refname(u),
+						    u->old_ref);
+				else
+					strbuf_addf(err, "cannot lock ref '%s': "
+						    "is at %s but expected %s",
+						    original_update_refname(u),
+						    referent.buf, u->old_ref);
+				ret = -1;
+				goto done;
+			}
+		} else if (u->flags & REF_HAVE_OLD && !oideq(&current_oid, &u->old_oid)) {
 			if (is_null_oid(&u->old_oid))
 				strbuf_addf(err, _("cannot lock ref '%s': "
 					    "reference already exists"),

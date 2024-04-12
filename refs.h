@@ -772,6 +772,7 @@ int ref_transaction_delete(struct ref_transaction *transaction,
 int ref_transaction_verify(struct ref_transaction *transaction,
 			   const char *refname,
 			   const struct object_id *old_oid,
+			   const char *old_ref,
 			   unsigned int flags,
 			   struct strbuf *err);
 
