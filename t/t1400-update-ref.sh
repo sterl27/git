@@ -1715,6 +1715,45 @@ test_expect_success "stdin ${type} symref-verify fails for mistaken null value" 
 	test_cmp expect actual
 '
 
+test_expect_success "stdin ${type} symref-delete fails without --no-deref" '
+	git symbolic-ref refs/heads/symref $a &&
+	create_stdin_buf ${type} "symref-delete refs/heads/symref" "$a" &&
+	test_must_fail git update-ref --stdin ${type} <stdin 2>err &&
+	grep "fatal: symref-delete: cannot operate with deref mode" err
+'
+
+test_expect_success "stdin ${type} fails symref-delete with no ref" '
+	create_stdin_buf ${type} "symref-delete " &&
+	test_must_fail git update-ref --stdin ${type} --no-deref <stdin 2>err &&
+	grep "fatal: symref-delete: missing <ref>" err
+'
+
+test_expect_success "stdin ${type} fails symref-delete with too many arguments" '
+	create_stdin_buf ${type} "symref-delete refs/heads/symref" "$a" "$a" &&
+	test_must_fail git update-ref --stdin ${type} --no-deref <stdin 2>err &&
+	if test "$type" = "-z"
+	then
+		grep "fatal: unknown command: $a" err
+	else
+		grep "fatal: symref-delete refs/heads/symref: extra input:  $a" err
+	fi
+'
+
+test_expect_success "stdin ${type} symref-delete ref fails with wrong old value" '
+	create_stdin_buf ${type} "symref-delete refs/heads/symref" "$m" &&
+	test_must_fail git update-ref --stdin ${type} --no-deref <stdin 2>err &&
+	grep "fatal: cannot lock ref '"'"'refs/heads/symref'"'"'" err &&
+	git symbolic-ref refs/heads/symref >expect &&
+	echo $a >actual &&
+	test_cmp expect actual
+'
+
+test_expect_success "stdin ${type} symref-delete ref works with right old value" '
+	create_stdin_buf ${type} "symref-delete refs/heads/symref" "$a" &&
+	git update-ref --stdin ${type} --no-deref <stdin &&
+	test_must_fail git rev-parse --verify -q $b
+'
+
 done
 
 test_done

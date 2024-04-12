@@ -981,7 +981,7 @@ int refs_delete_ref(struct ref_store *refs, const char *msg,
 	transaction = ref_store_transaction_begin(refs, &err);
 	if (!transaction ||
 	    ref_transaction_delete(transaction, refname, old_oid,
-				   flags, msg, &err) ||
+				   flags, NULL, msg, &err) ||
 	    ref_transaction_commit(transaction, &err)) {
 		error("%s", err.buf);
 		ref_transaction_free(transaction);
@@ -1220,6 +1220,7 @@ void ref_transaction_free(struct ref_transaction *transaction)
 	for (i = 0; i < transaction->nr; i++) {
 		free(transaction->updates[i]->msg);
 		free((void *)transaction->updates[i]->old_ref);
+		free((void *)transaction->updates[i]->new_ref);
 		free(transaction->updates[i]);
 	}
 	free(transaction->updates);
@@ -1252,6 +1253,8 @@ struct ref_update *ref_transaction_add_update(
 	if (update->flags & REF_SYMREF_UPDATE) {
 		if (old_ref)
 			update->old_ref = xstrdup(old_ref);
+		if (new_ref)
+			update->new_ref = xstrdup(new_ref);
 	} else {
 		if (flags & REF_HAVE_NEW)
 			oidcpy(&update->new_oid, new_oid);
@@ -1317,14 +1320,17 @@ int ref_transaction_create(struct ref_transaction *transaction,
 int ref_transaction_delete(struct ref_transaction *transaction,
 			   const char *refname,
 			   const struct object_id *old_oid,
-			   unsigned int flags, const char *msg,
+			   unsigned int flags,
+			   const char *old_ref,
+			   const char *msg,
 			   struct strbuf *err)
 {
-	if (old_oid && is_null_oid(old_oid))
+	if (!(flags & REF_SYMREF_UPDATE) && old_oid &&
+	    is_null_oid(old_oid))
 		BUG("delete called with old_oid set to zeros");
 	return ref_transaction_update(transaction, refname,
 				      null_oid(), old_oid,
-				      NULL, NULL, flags,
+				      NULL, old_ref, flags,
 				      msg, err);
 }
 
@@ -2748,7 +2754,7 @@ int refs_delete_refs(struct ref_store *refs, const char *logmsg,
 
 	for_each_string_list_item(item, refnames) {
 		ret = ref_transaction_delete(transaction, item->string,
-					     NULL, flags, msg, &err);
+					     NULL, flags, 0, msg, &err);
 		if (ret) {
 			warning(_("could not delete reference %s: %s"),
 				item->string, err.buf);
