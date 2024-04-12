@@ -1305,15 +1305,20 @@ int ref_transaction_update(struct ref_transaction *transaction,
 int ref_transaction_create(struct ref_transaction *transaction,
 			   const char *refname,
 			   const struct object_id *new_oid,
+			   const char *new_ref,
 			   unsigned int flags, const char *msg,
 			   struct strbuf *err)
 {
-	if (!new_oid || is_null_oid(new_oid)) {
+	if ((flags & REF_SYMREF_UPDATE) && !new_ref) {
+		strbuf_addf(err, "'%s' has a no new ref", refname);
+		return 1;
+	}
+	if (!(flags & REF_SYMREF_UPDATE) && (!new_oid || is_null_oid(new_oid))) {
 		strbuf_addf(err, "'%s' has a null OID", refname);
 		return 1;
 	}
 	return ref_transaction_update(transaction, refname, new_oid,
-				      null_oid(), NULL, NULL, flags,
+				      null_oid(), new_ref, NULL, flags,
 				      msg, err);
 }
 
