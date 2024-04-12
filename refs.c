@@ -2362,15 +2362,20 @@ static int run_transaction_hook(struct ref_transaction *transaction,
 
 	for (i = 0; i < transaction->nr; i++) {
 		struct ref_update *update = transaction->updates[i];
+		const char *new_value, *old_value;
 
-		if (update->flags & REF_SYMREF_UPDATE)
-			continue;
+		new_value = oid_to_hex(&update->new_oid);
+		old_value = oid_to_hex(&update->old_oid);
+
+		if (update->flags & REF_SYMREF_UPDATE) {
+			if (update->flags & REF_HAVE_NEW && !null_new_value(update))
+				new_value = update->new_ref;
+			if (update->flags & REF_HAVE_OLD && update->old_ref)
+				old_value = update->old_ref;
+		}
 
 		strbuf_reset(&buf);
-		strbuf_addf(&buf, "%s %s %s\n",
-			    oid_to_hex(&update->old_oid),
-			    oid_to_hex(&update->new_oid),
-			    update->refname);
+		strbuf_addf(&buf, "%s %s %s\n", old_value, new_value, update->refname);
 
 		if (write_in_full(proc.in, buf.buf, buf.len) < 0) {
 			if (errno != EPIPE) {
