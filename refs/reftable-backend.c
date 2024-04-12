@@ -905,7 +905,7 @@ static int reftable_be_transaction_prepare(struct ref_store *ref_store,
 				 */
 				new_update = ref_transaction_add_update(
 						transaction, referent.buf, new_flags,
-						&u->new_oid, &u->old_oid, NULL, NULL, u->msg);
+						&u->new_oid, &u->old_oid, u->new_ref, u->old_ref, u->msg);
 				new_update->parent_update = u;
 
 				/*
@@ -1102,6 +1102,11 @@ static int write_transaction_table(struct reftable_writer *writer, void *cb_data
 			   (u->flags & REF_FORCE_CREATE_REFLOG ||
 			    should_write_log(&arg->refs->base, u->refname))) {
 			struct reftable_log_record *log;
+
+			if (u->flags & REF_SYMREF_UPDATE && u->new_ref)
+				if (!refs_resolve_ref_unsafe(&arg->refs->base, u->new_ref,
+				     RESOLVE_REF_READING, &u->new_oid, NULL))
+					goto done;
 
 			ALLOC_GROW(logs, logs_nr + 1, logs_alloc);
 			log = &logs[logs_nr++];

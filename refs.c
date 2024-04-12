@@ -1246,21 +1246,15 @@ struct ref_update *ref_transaction_add_update(
 
 	update->flags = flags;
 
-	/*
-	 * The ref values are to be considered over the oid values when we're
-	 * doing symref operations.
-	 */
-	if (update->flags & REF_SYMREF_UPDATE) {
-		if (old_ref)
-			update->old_ref = xstrdup(old_ref);
-		if (new_ref)
-			update->new_ref = xstrdup(new_ref);
-	} else {
-		if (flags & REF_HAVE_NEW)
-			oidcpy(&update->new_oid, new_oid);
-		if (flags & REF_HAVE_OLD)
-			oidcpy(&update->old_oid, old_oid);
-	}
+	if (old_ref)
+		update->old_ref = xstrdup(old_ref);
+	if (new_ref)
+		update->new_ref = xstrdup(new_ref);
+	if (new_oid && flags & REF_HAVE_NEW)
+		oidcpy(&update->new_oid, new_oid);
+	if (old_oid && flags & REF_HAVE_OLD)
+		oidcpy(&update->old_oid, old_oid);
+
 	update->msg = normalize_reflog_message(msg);
 	return update;
 }

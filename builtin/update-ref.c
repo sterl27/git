@@ -238,6 +238,54 @@ static void parse_cmd_update(struct ref_transaction *transaction,
 	strbuf_release(&err);
 }
 
+static void parse_cmd_symref_update(struct ref_transaction *transaction,
+				    const char *next, const char *end)
+{
+	struct strbuf err = STRBUF_INIT;
+	char *refname, *new_ref, *old_ref;
+	struct object_id old_oid;
+	int have_old = 0;
+
+	refname = parse_refname(&next);
+	if (!refname)
+		die("symref-update: missing <ref>");
+
+	new_ref = parse_next_refname(&next);
+	if (!new_ref)
+		die("symref-update %s: missing <new-ref>", refname);
+	if (read_ref(new_ref, NULL))
+		die("symref-update %s: invalid <new-ref>", refname);
+
+	old_ref = parse_next_refname(&next);
+	/*
+	 * Since the user can also send in an old-oid, we try to parse
+	 * it as such too.
+	 */
+	if (old_ref && read_ref(old_ref, NULL)) {
+		if (!repo_get_oid(the_repository, old_ref, &old_oid)) {
+			old_ref = NULL;
+			have_old = 1;
+		} else
+			die("symref-update %s: invalid <old-ref> or <old-oid>", refname);
+	}
+
+	if (*next != line_termination)
+		die("symref-update %s: extra input: %s", refname, next);
+
+	update_flags |= create_reflog_flag | REF_SYMREF_UPDATE;
+	if (ref_transaction_update(transaction, refname, NULL,
+				   have_old ? &old_oid : NULL,
+				   new_ref, old_ref, update_flags,
+				   msg, &err))
+		die("%s", err.buf);
+
+	update_flags = default_flags;
+	free(refname);
+	free(old_ref);
+	free(new_ref);
+	strbuf_release(&err);
+}
+
 static void parse_cmd_create(struct ref_transaction *transaction,
 			     const char *next, const char *end)
 {
@@ -509,6 +557,7 @@ static const struct parse_cmd {
 	{ "create",        parse_cmd_create,        2, UPDATE_REFS_OPEN },
 	{ "delete",        parse_cmd_delete,        2, UPDATE_REFS_OPEN },
 	{ "verify",        parse_cmd_verify,        2, UPDATE_REFS_OPEN },
+	{ "symref-update", parse_cmd_symref_update, 3, UPDATE_REFS_OPEN },
 	{ "symref-create", parse_cmd_symref_create, 2, UPDATE_REFS_OPEN },
 	{ "symref-delete", parse_cmd_symref_delete, 2, UPDATE_REFS_OPEN },
 	{ "symref-verify", parse_cmd_symref_verify, 2, UPDATE_REFS_OPEN },

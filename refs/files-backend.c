@@ -2386,7 +2386,7 @@ static int split_symref_update(struct ref_update *update,
 	new_update = ref_transaction_add_update(
 			transaction, referent, new_flags,
 			&update->new_oid, &update->old_oid,
-			NULL, NULL, update->msg);
+			update->new_ref, update->old_ref, update->msg);
 
 	new_update->parent_update = update;
 
@@ -2609,7 +2609,9 @@ static int lock_ref_for_update(struct files_ref_store *refs,
 		}
 	}
 
-	if (update->flags & REF_SYMREF_UPDATE && update->new_ref) {
+	if (update->flags & REF_SYMREF_UPDATE &&
+	    !(update->flags & REF_LOG_ONLY) &&
+	    update->new_ref) {
 		if (create_symref_lock(refs, lock, update->refname, update->new_ref)) {
 			ret = TRANSACTION_GENERIC_ERROR;
 			goto out;
@@ -2627,12 +2629,9 @@ static int lock_ref_for_update(struct files_ref_store *refs,
 		 * phase of the transaction only needs to commit the lock.
 		 */
 		update->flags |= REF_NEEDS_COMMIT;
-	}
-
-
-	if ((update->flags & REF_HAVE_NEW) &&
-	    !(update->flags & REF_DELETING) &&
-	    !(update->flags & REF_LOG_ONLY)) {
+	} else if ((update->flags & REF_HAVE_NEW) &&
+		   !(update->flags & REF_DELETING) &&
+		   !(update->flags & REF_LOG_ONLY)) {
 		if (!(update->type & REF_ISSYMREF) &&
 		    oideq(&lock->old_oid, &update->new_oid)) {
 			/*
